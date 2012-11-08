@@ -137,7 +137,28 @@ def extract_topic(url, destination):
         topic.write('\n\n')
     topic.close()
 
+class Infinite(int):
+    def __gt__(self, other):
+        return True
+    def __ge__(self, other):
+        return True
+    def __lt__(self, other):
+        return False
+    def __le__(self, other):
+        return False
+    def __sub__(self, other):
+        return Infinite()
+
+class LineBuffer(html2rest.LineBuffer):
+    """LineBuffer without wrapping."""
+    def __init__(self):
+        self._lines = []
+        self._wrapper = html2rest.TextWrapper(width=Infinite())
+
 class Parser(html2rest.Parser):
+    def __init__(self, *args, **kwargs):
+        html2rest.Parser.__init__(self, *args, **kwargs)
+        self.linebuffer = LineBuffer()
     def start_br(self, data):
         self.write('\n\n')
     def close(self):
