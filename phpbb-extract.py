@@ -29,6 +29,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 ###
 
+import re
 import os
 import logging
 import argparse
@@ -119,6 +120,9 @@ def extract_topic(url, destination):
     if os.path.isfile(destination):
         os.unlink(destination)
     topic = open(destination, 'a')
+    topic.write(
+        '.. role:: underline\n'
+        '   :class: underline\n\n')
     link = pq(page('div#page-body h2 a'))
     title = link.text().encode('utf8')
     slug = link.attr('href').rsplit('/', 1)[1]
@@ -161,6 +165,10 @@ class Parser(html2rest.Parser):
         self.linebuffer = LineBuffer()
     def start_br(self, data):
         self.write('\n\n')
+    def start_u(self, data):
+        self.data(':underline:`')
+    def end_u(self):
+        self.data('`')
     def close(self):
         self.write('\n\n')
         for href, link in self.hrefs.items():
@@ -168,10 +176,19 @@ class Parser(html2rest.Parser):
                 self.writeline('.. _%s: %s' % (link, href))
 
 
-
+_style_regexp = re.compile('<span style="(?P<style>[^"]+)"> *(?P<content>[^<]*?) *</span>')
+def _style_replace(match):
+    style = match.group(1)
+    content = match.group(2)
+    if style == 'font-weight: bold':
+        return '<b>%s</b>' % content
+    if style == 'text-decoration: underline':
+        return '<u>%s</u>' % content
+    else:
+        return content
 def write_message(content, fd, url, destination):
     parser = Parser(fd, 'utf8', destination, url)
-    parser.feed(content.decode('utf8'))
+    parser.feed(_style_regexp.sub(_style_replace, content).decode('utf8'))
     parser.close()
 
 
@@ -185,6 +202,17 @@ def main():
     base_url = args.base_url
     destination = args.dest
 
+    staticdir = os.path.join(destination, '_static')
+    css = os.path.join(staticdir, 'phpbb_import.css')
+    if not os.path.isdir(staticdir):
+        os.mkdir(staticdir)
+    if os.path.isfile(css):
+        os.unlink(css)
+    with open(css, 'a') as css:
+        css.write('@import url("default.css");\n\n'
+            'span.underline {\n'
+            '   text-decoration: underline;\n'
+            '}\n')
     extract_category(base_url, destination)
 
 if __name__ == '__main__':
