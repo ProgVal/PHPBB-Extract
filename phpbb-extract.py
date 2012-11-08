@@ -176,10 +176,11 @@ class Parser(html2rest.Parser):
                 self.writeline('.. _%s: %s' % (link, href))
 
 
-_style_regexp = re.compile('<span style="(?P<style>[^"]+)"> *(?P<content>[^<]*?) *</span>')
+_style_regexp = re.compile('(?P<prefix>(<br />)?)<span style="(?P<style>[^"]+)"> *(?P<content>[^<]*?) *</span>')
 def _style_replace(match):
-    style = match.group(1)
-    content = match.group(2)
+    prefix = match.group('prefix')
+    style = match.group('style')
+    content = match.group('content')
     if style == 'font-weight: bold':
         return '<b>%s</b>' % content
     if style == 'text-decoration: underline':
