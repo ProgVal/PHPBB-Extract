@@ -114,10 +114,6 @@ def extract_topic(url, destination, base_url):
     def add_messages(page):
         messages.extend(page('div#page-body div.post div.inner div.postbody'))
     page = load(url)
-    add_messages(page)
-    while page('form.viewtopic'):
-        page = load('form.viewtopic fieldset a.right-box').attr('href')
-        add_messages(page)
 
     if os.path.isfile(destination):
         os.unlink(destination)
@@ -129,6 +125,11 @@ def extract_topic(url, destination, base_url):
     title = link.text().encode('utf8')
     slug = link.attr('href').rsplit('/', 1)[1]
     topic.write('.. _topic_%s:\n\n%s\n%s\n\n' % (slug, title, '*'*len(title)))
+
+    add_messages(page)
+    while page('form#viewtopic'):
+        page = load(page('form#viewtopic fieldset a.right-box').attr('href'))
+        add_messages(page)
 
     for message in map(pq, messages):
         id_ = message('h3 a').attr('href').rsplit('#p', 1)[1]
