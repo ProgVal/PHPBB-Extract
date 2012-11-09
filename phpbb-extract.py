@@ -210,6 +210,8 @@ class Parser(html2rest.Parser):
     def end_li(self):
         if self.lists:
             html2rest.Parser.end_li(self)
+    def start_phpbbextractlink(self, attrs):
+        self.data('<%s>' % attrs[0][1])
     def unknown_starttag(self, tag, attrs):
         if tag.startswith('topic_'): # This is a reference:
             assert attrs == [], attrs
@@ -232,14 +234,20 @@ def style_replace(data):
     return _style_regexp.sub(_style_replace, data)
 
 def link_replace(data, base_url):
-    _link_regexp = re.compile('<a href="%s([^"]*)/(?P<slug>[^"]+).html(#p(?P<postid>[0-9]+))?" class="postlink">(?P<content>.*?)</a>' % base_url)
+    _link_regexp = re.compile('<a( class="postlink")? href="(?P<link>[^"]+)"( class="postlink")?>(?P<content>.*?)</a>')
     def _link_replace(match):
+        content = match.group('content')
+        link = match.group('link')
+        return '`%s <phpbbextractlink href="%s">`_' % (content, link)
+
+    _internal_link_regexp = re.compile('<a( class="postlink")? href="%s([^"]*)/(?P<slug>[^"]+).html(#p(?P<postid>[0-9]+))?"( class="postlink")?>(?P<content>.*?)</a>' % base_url)
+    def _internal_link_replace(match):
         content = match.group('content')
         slug = match.group('slug')
         postid = match.group('postid')
         post = ('_' + postid) if postid else ''
         return ':ref:`%s <topic_%s%s>`' % (content, slug, post)
-    return _link_regexp.sub(_link_replace, data)
+    return _link_regexp.sub(_link_replace, _internal_link_regexp.sub(_internal_link_replace, data))
 
 def write_message(content, fd, url, destination, base_url):
     parser = Parser(fd, 'utf8', destination, url)
