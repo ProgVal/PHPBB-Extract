@@ -110,6 +110,7 @@ def extract_forum(url, destination, base_url):
     while page('form fieldset.display-options'):
         page = load(page('form fieldset.display-options a.right-box').attr('href'))
         add_topics(page)
+    topics_in_index = multiprocessing.Queue()
     for topic in map(pq, topics):
         link = pq(topic('dt a')).attr('href')
         slug = link.rsplit('/', 1)[1][:-len('.html')]
@@ -117,11 +118,14 @@ def extract_forum(url, destination, base_url):
         def _extract_topic_wrapper():
             try:
                 if extract_topic(link, os.path.join(destination, slug + '.rst'), base_url):
-                    index.write('    %s.rst\n' % slug)
+                    topics_in_index.put(slug)
             finally:
                 running_processes.release()
         running_processes.acquire()
         multiprocessing.Process(target=_extract_topic_wrapper).start()
+    while not topics_in_index.empty():
+        index.write('    %s.rst\n' % topics_in_index.get())
+    index.close()
 
 def extract_topic(url, destination, base_url):
     logging.info('Mirroring to %s (topic).' % destination)
