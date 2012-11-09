@@ -100,7 +100,14 @@ def extract_forum(url, destination, base_url):
     index = open(index, 'a')
     index.write('\n\n.. toctree::\n    :maxdepth: 1\n\n')
     
-    topics = load(url)('div.forumbg div.inner ul.topics li dl')
+    topics = []
+    def add_topics(page):
+        topics.extend(page('div.forumbg div.inner ul.topics li dl'))
+    page = load(url)
+    add_topics(page)
+    while page('form fieldset.display-options'):
+        page = load(page('form fieldset.display-options a.right-box').attr('href'))
+        add_topics(page)
     for topic in map(pq, topics):
         link = pq(topic('dt a')).attr('href')
         slug = link.rsplit('/', 1)[1][:-len('.html')]
@@ -177,12 +184,18 @@ class Parser(html2rest.Parser):
         for href, link in self.hrefs.items():
             if href[0] != '#' and not link.startswith('http'):
                 self.writeline('.. _%s: %s' % (link, href))
-    def unknown_starttag(self, tag, attr):
+    def start_li(self, attrs):
+        if self.lists:
+            html2rest.Parser.start_li(self, attrs)
+    def end_li(self):
+        if self.lists:
+            html2rest.Parser.end_li(self)
+    def unknown_starttag(self, tag, attrs):
         if tag.startswith('topic_'): # This is a reference:
-            assert attr == [], attr
+            assert attrs == [], attrs
             self.data('<%s>' % tag)
         else:
-            html2rest.Parser.unknown_starttag(self, tag, attr)
+            html2rest.Parser.unknown_starttag(self, tag, attrs)
 
 
 def style_replace(data):
