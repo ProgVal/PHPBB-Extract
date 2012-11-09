@@ -31,6 +31,7 @@
 
 import re
 import os
+import urllib2
 import logging
 import argparse
 import html2rest
@@ -111,8 +112,8 @@ def extract_forum(url, destination, base_url):
     for topic in map(pq, topics):
         link = pq(topic('dt a')).attr('href')
         slug = link.rsplit('/', 1)[1][:-len('.html')]
-        index.write('    %s.rst\n' % slug)
-        extract_topic(link, os.path.join(destination, slug + '.rst'), base_url)
+        if extract_topic(link, os.path.join(destination, slug + '.rst'), base_url):
+            index.write('    %s.rst\n' % slug)
 
 def extract_topic(url, destination, base_url):
     logging.info('Mirroring to %s (topic).' % destination)
@@ -120,7 +121,12 @@ def extract_topic(url, destination, base_url):
     messages = []
     def add_messages(page):
         messages.extend(page('div#page-body div.post div.inner div.postbody'))
-    page = load(url)
+
+    try:
+        page = load(url)
+    except urllib2.HTTPError:
+        return False
+
 
     if os.path.isfile(destination):
         os.unlink(destination)
@@ -141,7 +147,7 @@ def extract_topic(url, destination, base_url):
     for message in map(pq, messages):
         id_ = message('h3 a').attr('href').rsplit('#p', 1)[1]
         title = message('h3 a').text().encode('utf8')
-        author = message('p.author strong span').text().encode('utf8')
+        author = message('p.author strong').text().encode('utf8')
         content = message('div.content').html().encode('utf8')
 
         topic.write('.. _post_%s_%s:\n\n' % (slug, id_))
@@ -150,6 +156,8 @@ def extract_topic(url, destination, base_url):
         write_message(content, topic, url, destination, base_url)
         topic.write('\n\n')
     topic.close()
+
+    return True
 
 class Infinite(int):
     def __gt__(self, other):
