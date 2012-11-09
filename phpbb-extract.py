@@ -203,7 +203,9 @@ class Parser(html2rest.Parser):
     def start_u(self, data):
         self.data(':underline:`')
     def end_u(self):
-        self.data('`')
+        self.data('` ')
+    def end_b(self):
+        self.data('** ')
     def close(self):
         self.write('\n\n')
         for href, link in self.hrefs.items():
