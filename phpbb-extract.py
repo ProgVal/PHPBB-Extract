@@ -133,7 +133,7 @@ def extract_topic(url, destination, base_url):
     for message in map(pq, messages):
         id_ = message('h3 a').attr('href').rsplit('#p', 1)[1]
         title = message('h3 a').text().encode('utf8')
-        author = message('p.author strong span').text()
+        author = message('p.author strong span').text().encode('utf8')
         content = message('div.content').html().encode('utf8')
 
         topic.write('.. _post_%s_%s:\n\n' % (slug, id_))
