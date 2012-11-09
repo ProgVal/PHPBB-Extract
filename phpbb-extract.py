@@ -35,6 +35,7 @@ import urllib2
 import logging
 import argparse
 import html2rest
+import multiprocessing
 from pyquery import PyQuery as pq
 
 logging.basicConfig(level=logging.INFO)
@@ -112,8 +113,15 @@ def extract_forum(url, destination, base_url):
     for topic in map(pq, topics):
         link = pq(topic('dt a')).attr('href')
         slug = link.rsplit('/', 1)[1][:-len('.html')]
-        if extract_topic(link, os.path.join(destination, slug + '.rst'), base_url):
-            index.write('    %s.rst\n' % slug)
+
+        def _extract_topic_wrapper():
+            try:
+                if extract_topic(link, os.path.join(destination, slug + '.rst'), base_url):
+                    index.write('    %s.rst\n' % slug)
+            finally:
+                running_processes.release()
+        running_processes.acquire()
+        multiprocessing.Process(target=_extract_topic_wrapper).start()
 
 def extract_topic(url, destination, base_url):
     logging.info('Mirroring to %s (topic).' % destination)
@@ -236,16 +244,21 @@ def write_message(content, fd, url, destination, base_url):
     parser.feed(content)
     parser.close()
 
+running_processes = None
 
 def main():
+    global running_processes
     parser = argparse.ArgumentParser(description='Extract messages '
             'from a PHPBB forum.')
     parser.add_argument('base_url')
     parser.add_argument('--dest', default='mirror/')
+    parser.add_argument('-j', type=int, default=4,
+            help='Number of processes to spawn.')
     args = parser.parse_args()
 
     base_url = args.base_url
     destination = args.dest
+    running_processes = multiprocessing.Semaphore(args.j)
 
     staticdir = os.path.join(destination, '_static')
     css = os.path.join(staticdir, 'phpbb_import.css')
