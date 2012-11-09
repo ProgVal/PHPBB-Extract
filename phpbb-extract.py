@@ -111,6 +111,7 @@ def extract_forum(url, destination, base_url):
         page = load(page('form fieldset.display-options a.right-box').attr('href'))
         add_topics(page)
     topics_in_index = multiprocessing.Queue()
+    processes = []
     for topic in map(pq, topics):
         link = pq(topic('dt a')).attr('href')
         slug = link.rsplit('/', 1)[1][:-len('.html')]
@@ -122,7 +123,11 @@ def extract_forum(url, destination, base_url):
             finally:
                 running_processes.release()
         running_processes.acquire()
-        multiprocessing.Process(target=_extract_topic_wrapper).start()
+        process = multiprocessing.Process(target=_extract_topic_wrapper)
+        process.start()
+        processes.append(process)
+    for process in processes:
+        process.join()
     while not topics_in_index.empty():
         index.write('    %s.rst\n' % topics_in_index.get())
     index.close()
