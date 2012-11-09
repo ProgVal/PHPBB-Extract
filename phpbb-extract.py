@@ -51,7 +51,7 @@ def load(url):
         cache[url] = page
         return page
 
-def extract_category(url, destination):
+def extract_category(url, destination, base_url):
     logging.info('Mirroring to %s (category).' % destination)
     assert '..' not in destination
     if not os.path.isdir(destination):
@@ -80,18 +80,20 @@ def extract_category(url, destination):
             folder = slug.rsplit('/', 2)[1]
             index.write('    %s/index.rst\n' % folder)
             extract_category(slug,
-                    os.path.join(destination, folder))
+                    os.path.join(destination, folder),
+                    base_url)
         else:
             titles = category('ul.topiclist.forums li dl dt a.forumtitle')
             for title in map(pq, titles):
                 folder = title('a').attr('href').rsplit('/', 2)[1]
                 index.write('    %s/index.rst\n' % folder)
                 extract_forum(title.attr('href'),
-                        os.path.join(destination, folder))
+                        os.path.join(destination, folder),
+                        base_url)
 
-def extract_forum(url, destination):
+def extract_forum(url, destination, base_url):
     logging.info('Mirroring to %s (forum).' % destination)
-    extract_category(url, destination)
+    extract_category(url, destination, base_url)
 
     index = os.path.join(destination, 'index.rst')
     # Do not remove it; have been created by extract_category.
@@ -103,9 +105,9 @@ def extract_forum(url, destination):
         link = pq(topic('dt a')).attr('href')
         slug = link.rsplit('/', 1)[1][:-len('.html')]
         index.write('    %s.rst\n' % slug)
-        extract_topic(link, os.path.join(destination, slug + '.rst'))
+        extract_topic(link, os.path.join(destination, slug + '.rst'), base_url)
 
-def extract_topic(url, destination):
+def extract_topic(url, destination, base_url):
     logging.info('Mirroring to %s (topic).' % destination)
 
     messages = []
@@ -137,7 +139,7 @@ def extract_topic(url, destination):
         topic.write('.. _post_%s_%s:\n\n' % (slug, id_))
         topic.write('%s (%s)\n%s\n\n' %
                 (title, author, '='*(len(title) + 3 + len(author))))
-        write_message(content, topic, url, destination)
+        write_message(content, topic, url, destination, base_url)
         topic.write('\n\n')
     topic.close()
 
@@ -174,22 +176,42 @@ class Parser(html2rest.Parser):
         for href, link in self.hrefs.items():
             if href[0] != '#' and not link.startswith('http'):
                 self.writeline('.. _%s: %s' % (link, href))
+    def unknown_starttag(self, tag, attr):
+        if tag.startswith('topic_'): # This is a reference:
+            assert attr == [], attr
+            self.data('<%s>' % tag)
+        else:
+            html2rest.Parser.unknown_starttag(self, tag, attr)
 
 
-_style_regexp = re.compile('(?P<prefix>(<br />)?)<span style="(?P<style>[^"]+)"> *(?P<content>[^<]*?) *</span>')
-def _style_replace(match):
-    prefix = match.group('prefix')
-    style = match.group('style')
-    content = match.group('content')
-    if style == 'font-weight: bold':
-        return '<b>%s</b>' % content
-    if style == 'text-decoration: underline':
-        return '<u>%s</u>' % content
-    else:
-        return content
-def write_message(content, fd, url, destination):
+def style_replace(data):
+    _style_regexp = re.compile('<span style="(?P<style>[^"]+)"> *(?P<content>[^<]*?) *</span>')
+    def _style_replace(match):
+        style = match.group('style')
+        content = match.group('content')
+        if style == 'font-weight: bold':
+            return '<b>%s</b>' % content
+        if style == 'text-decoration: underline':
+            return '<u>%s</u>' % content
+        else:
+            return content
+    return _style_regexp.sub(_style_replace, data)
+
+def link_replace(data, base_url):
+    _link_regexp = re.compile('<a href="%s([^"]*)/(?P<slug>[^"]+).html(#p(?P<postid>[0-9]+))?" class="postlink">(?P<content>.*?)</a>' % base_url)
+    def _link_replace(match):
+        content = match.group('content')
+        slug = match.group('slug')
+        postid = match.group('postid')
+        post = ('_' + postid) if postid else ''
+        return ':ref:`%s <topic_%s%s>`' % (content, slug, post)
+    return _link_regexp.sub(_link_replace, data)
+
+def write_message(content, fd, url, destination, base_url):
     parser = Parser(fd, 'utf8', destination, url)
-    parser.feed(_style_regexp.sub(_style_replace, content).decode('utf8'))
+    content = style_replace(content.decode('utf8'))
+    content = link_replace(content, base_url)
+    parser.feed(content)
     parser.close()
 
 
@@ -214,7 +236,7 @@ def main():
             'span.underline {\n'
             '   text-decoration: underline;\n'
             '}\n')
-    extract_category(base_url, destination)
+    extract_category(base_url, destination, base_url)
 
 if __name__ == '__main__':
     main()
