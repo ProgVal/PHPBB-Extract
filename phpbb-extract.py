@@ -34,6 +34,7 @@ import os
 import time
 import urllib2
 import logging
+import httplib
 import argparse
 import html2rest
 import multiprocessing
@@ -41,18 +42,14 @@ from pyquery import PyQuery as pq
 
 logging.basicConfig(level=logging.INFO)
 
-cache = {}
-
 def load(url):
-    if url in cache:
-        return cache[url]
-    else:
+    for x in xrange(1, 3):
         try:
-            page = pq(url)
-        except KeyboardInterrupt:
-            exit()
-        cache[url] = page
-        return page
+            return pq(url)
+        except httplib.IncompleteRead:
+            logging.error('Failed downloading %s (attempt #%i)' % (url, x))
+    exit()
+
 
 def extract_category(url, destination, base_url):
     logging.info('Mirroring to %s (category).' % destination)
@@ -131,9 +128,8 @@ def extract_forum(url, destination, base_url):
                 process.start()
                 started = True
             except OSError as e: # Cannot allocate memory
-                logging.error('Cannot fork: out of memory. '
-                        'Will try again in 20 seconds.')
-                time.sleep(20)
+                logging.error('Cannot fork: out of memory.')
+                exit()
         processes.append(process)
     for process in processes:
         process.join()
