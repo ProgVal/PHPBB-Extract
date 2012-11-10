@@ -35,7 +35,6 @@ import time
 import urllib2
 import logging
 import argparse
-import traceback
 import html2rest
 import multiprocessing
 from pyquery import PyQuery as pq
@@ -132,7 +131,8 @@ def extract_forum(url, destination, base_url):
                 process.start()
                 started = True
             except OSError as e: # Cannot allocate memory
-                traceback.print_exc(e)
+                logging.error('Cannot fork: out of memory. '
+                        'Will try again in 20 seconds.')
                 time.sleep(20)
         processes.append(process)
     for process in processes:
@@ -151,6 +151,7 @@ def extract_topic(url, destination, base_url):
     try:
         page = load(url)
     except urllib2.HTTPError:
+        logging.warning('Topic in the index but does not exist: %s' % url)
         return False
 
 
