@@ -31,9 +31,11 @@
 
 import re
 import os
+import time
 import urllib2
 import logging
 import argparse
+import traceback
 import html2rest
 import multiprocessing
 from pyquery import PyQuery as pq
@@ -124,7 +126,14 @@ def extract_forum(url, destination, base_url):
                 running_processes.release()
         running_processes.acquire()
         process = multiprocessing.Process(target=_extract_topic_wrapper)
-        process.start()
+        started = False
+        while not started:
+            try:
+                process.start()
+                started = True
+            except OSError as e: # Cannot allocate memory
+                traceback.print_exc(e)
+                time.sleep(20)
         processes.append(process)
     for process in processes:
         process.join()
