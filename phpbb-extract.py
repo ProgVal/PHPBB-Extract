@@ -276,12 +276,17 @@ running_processes = None
 
 def main():
     global running_processes
-    parser = argparse.ArgumentParser(description='Extract messages '
-            'from a PHPBB forum.')
-    parser.add_argument('base_url')
-    parser.add_argument('--dest', default='mirror/')
-    parser.add_argument('-j', type=int, default=4,
-            help='Number of processes to spawn.')
+    parser = argparse.ArgumentParser(description='Extract topics '
+            'from a PHPBB forum into ReST files (compatible with Sphinx).')
+    parser.add_argument('base_url', help='The base URL of the forum you '
+            'want to mirror.')
+    parser.add_argument('--dest', metavar='destination', default='mirror/',
+            help='The destination of the mirror. Defaults to mirror/')
+    parser.add_argument('-j', metavar='processes', type=int, default=4,
+            help='Number of processes to spawn. Recommended number is '
+            'three or four times the number of actual cpu cores, as a '
+            'process will first load a page and then parse it. '
+            'Defaults to 4.')
     args = parser.parse_args()
 
     base_url = args.base_url
