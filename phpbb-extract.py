@@ -51,7 +51,22 @@ def load(url):
     exit()
 
 
-def extract_category(url, destination, base_url):
+def extract_category(*args):
+    # Running _extract_category in another process prevents wasting time
+    # with fetching last topics.
+    # For some unknown reason (garbage collector not doing its job?),
+    # _extract_category consumes up to 20MB for big categories, and running
+    # it in a forked process allows us to clear that memory when exiting
+    # this process.
+
+    # We are not counting in running_processes, as the script would block
+    # if the allowed number of processes is lower than the number of
+    # categories.
+    process = multiprocessing.Process(target=_extract_category, args=args)
+    process.start()
+    process.join()
+
+def _extract_category(url, destination, base_url):
     logging.info('Mirroring to %s (category).' % destination)
     assert '..' not in destination
     if not os.path.isdir(destination):
@@ -90,6 +105,8 @@ def extract_category(url, destination, base_url):
                 extract_forum(title.attr('href'),
                         os.path.join(destination, folder),
                         base_url)
+
+    index.close()
 
 def extract_forum(url, destination, base_url):
     logging.info('Mirroring to %s (forum).' % destination)
